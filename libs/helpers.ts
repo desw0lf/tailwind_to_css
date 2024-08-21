@@ -143,7 +143,6 @@ export const getConvertedClasses = (input) => {
 
     const { cssCode, notFound } = converted.reduce((acc, { cssCode, notFound, type }) => {
         acc.notFound = acc.notFound.concat(notFound);
-        acc.cssCode = acc.cssCode + "\n";
         if (type in breakpointPartialClasses) {
             acc.cssCode = acc.cssCode + breakpointReplacer(cssCode, type as keyof typeof breakpointPartialClasses);
             return acc;

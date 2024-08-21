@@ -26,6 +26,8 @@ const arbitrarySupportedClasses = {
     color: "color",
     "max-w": "max-width",
     "max-h": "max-height",
+    "min-w": "min-width",
+    "min-h": "min-height"
 };
 
 const convertToCss = (classNames: string[]) => {

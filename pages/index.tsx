@@ -9,6 +9,9 @@ import { convertFromCssToJss, getConvertedClasses } from '../libs/helpers';
 import CodeKeep from '../public/CodeKeep.svg';
 import Logo from '../public/logo.svg';
 
+const TAILWIND_DOCS_URL_PARTIAL = "tailwindcss.com/docs";
+const IM_FEELING_LUCKY_URL = `https://google.com/search?btnI=1&q=site:${TAILWIND_DOCS_URL_PARTIAL}%20`;
+
 export default function App() {
 	const [input, setInput] = useState('');
 
@@ -16,11 +19,14 @@ export default function App() {
 
 	const [resultJSS, setResultJSS] = useState('');
 
+	const [resultNotFound, setResultNotFound] = useState([]);
+
 	useEffect(() => {
-		const resultCss = getConvertedClasses(input);
+		const { resultCss, notFound } = getConvertedClasses(input);
 		const resultJSS = convertFromCssToJss(resultCss);
 		setResult(resultCss);
 		setResultJSS(resultJSS);
+		setResultNotFound(notFound);
 	}, [input]);
 
 	return (
@@ -63,15 +69,25 @@ export default function App() {
 				</header>
 			</nav>
 
-			<section className="flex flex-col-reverse md:flex-row bg-gray-900 h-screen ">
-				<textarea
-					className="w-full resize-none  border-none flex-grow p-3 bg-[#111] text-gray-300  outline-none "
-					value={input}
-					onChange={(e) => setInput(e.target.value)}
-					placeholder="Enter your tailwind class names here... Eg: bg-red-500 text-center"
-					autoFocus
-				></textarea>
-
+			<section className="flex flex-col-reverse md:flex-row bg-gray-900 flex-grow">
+				<div className="flex w-full flex-col">
+					<textarea
+						className="w-full resize-none flex-grow p-3 bg-[#111] text-gray-300 outline-none border-none"
+						value={input}
+						onChange={(e) => setInput(e.target.value)}
+						placeholder="Enter your tailwind class names here... Eg: bg-red-500 text-center"
+						autoFocus
+					></textarea>
+					<div
+						className="w-full resize-none p-3 bg-[#2d0000] text-gray-300 outline-none border-none flex flex-wrap"
+						style={{gap: "4px"}}
+					>
+						{resultNotFound.length === 0 && <span>Not found classes</span>}
+						{resultNotFound.map((cl) => {
+							return <a className="hover:underline" key={cl} href={IM_FEELING_LUCKY_URL + cl} target="_blank" rel="nofollow">{cl}</a>
+						})}
+					</div>
+				</div>
 				{/* CSS */}
 				<div className="flex w-full bg-[#111] border-l border-gray-700">
 					<textarea

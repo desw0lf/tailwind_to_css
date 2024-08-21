@@ -30,24 +30,48 @@ const arbitrarySupportedClasses = {
     "min-h": "min-height"
 };
 
-const convertToCss = (classNames: string[]) => {
+const breakpointPartialClasses = {
+    "sm": "sm",
+    "md": "md",
+    "lg": "lg",
+    "xl": "xl",
+    "2xl": "2xl"
+} as const;
+
+const partialClasses = {
+    hover: "hover",
+    disabled: "disabled"
+} as const;
+
+const allPartialClasses = {
+    ...breakpointPartialClasses,
+    ...partialClasses
+} as const;
+
+const getNotFoundClasses = (classNames: string[], foundClassNames: string[]) => {
+    const prefixes: string[] = Object.values(allPartialClasses);
+    return classNames.filter((val) => !foundClassNames.includes(val)).filter((val) => !prefixes.some((pre) => val.startsWith(pre)));
+}
+
+const convertToCss = (classNames: string[], type = "core") => {
     let cssCode = ``;
+    let foundClasses = [];
     CheatSheet.forEach((element) => {
         element.content.forEach((content) => {
             content.table.forEach((list) => {
                 if (classNames.includes(list[0])) {
-
-                    cssCode += `${list[1]} \n`;
+                    foundClasses.push(list[0]);
+                    cssCode += `${list[1]}\n`;
                 }
 
                 if (classNames.includes(list[1])) {
+                    foundClasses.push(list[1]);
                     const semicolon = list[2][list[2].length - 1] !== ";" ? ";" : "";
-                    cssCode += `${list[2]}${semicolon} \n`;
+                    cssCode += `${list[2]}${semicolon}\n`;
                 }
             });
         });
     });
-
     // Check for arbitrary values
 
     const arbitraryClasses = classNames.filter((className) =>
@@ -60,6 +84,7 @@ const convertToCss = (classNames: string[]) => {
 
             const properyValue = className.match(/(?<=\[)[^\][]*(?=])/g)[0];
             if (arbitrarySupportedClasses[property]) {
+                foundClasses.push(className);
                 cssCode += `${arbitrarySupportedClasses[property]}: ${properyValue};\n`;
             }
         }
@@ -68,7 +93,8 @@ const convertToCss = (classNames: string[]) => {
         }
     });
 
-    return cssCode;
+    const nfc = getNotFoundClasses(classNames, foundClasses);
+    return { cssCode, notFound: type === "core" ? nfc : nfc.map((c) => type + ":" + c), type };
 };
 
 const getBreakPoints = (input: string, breakpoint: string) => {
@@ -79,54 +105,63 @@ const getBreakPoints = (input: string, breakpoint: string) => {
         .map((i: string) => i.substring(3));
 };
 
-const getHoverClass = (input: string) => {
+const getPrefixClass = (input: string, prefix: string) => {
     return input
         .replaceAll("\n", " ")
         .split(" ")
-        .filter((i) => i.startsWith("hover:"))
-        .map((i) => i.replace("hover:", ""));
+        .filter((i) => i.startsWith(`${prefix}:`))
+        .map((i) => i.replace(`${prefix}:`, ""));
 };
+
+const breakpointReplacer = (cssCode: string, type: keyof typeof breakpointPartialClasses) => {
+    const m: Record<keyof typeof breakpointPartialClasses, number> = { "sm": 0, "md": 1, "lg": 2, "xl": 3, "2xl": 4 };
+    const breakpoints = CheatSheet[0].content[1].table;
+    const index = m[type];
+    if (index === undefined) {
+        throw new Error(";/");
+    }
+    return breakpoints[index][1].replace("...", "\n  " + cssCode)
+    
+}
 
 export const getConvertedClasses = (input) => {
 
-    if (input === "") return "";
+    if (input === "") return { resultCss: "", notFound: [] };
 
     const classNames = input.split(/\s+/).map((i) => i.trim()).filter((i) => i !== "");
-    const breakpoints = CheatSheet[0].content[1].table;
 
-    const hoverClasses = getHoverClass(input);
+    const allPrefixClasses = Object.values(partialClasses)
+        .map((t) => [getPrefixClass(input, t), t])
+        .filter(([a]) => a.length !== 0)
+        .map(([c, t]: [string[], keyof typeof partialClasses]) => convertToCss(c, t));
+    const allBreakpointClasses = Object.values(breakpointPartialClasses)
+        .map((t) => [getBreakPoints(input, t), t])
+        .filter(([a]) => a.length !== 0)
+        .map(([c, t]: [string[], keyof typeof breakpointPartialClasses]) => convertToCss(c, t));
 
-    const smClasses = getBreakPoints(input, "sm");
-    const mdClasses = getBreakPoints(input, "md");
-    const lgClasses = getBreakPoints(input, "lg");
-    const xlClasses = getBreakPoints(input, "xl");
-    const _2xlClasses = getBreakPoints(input, "2xl");
+    const converted = [convertToCss(classNames), ...allBreakpointClasses, ...allPrefixClasses];
 
-    let resultCss = `${convertToCss(classNames)}
-${smClasses.length !== 0
-            ? breakpoints[0][1].replace("...", "\n  " + convertToCss(smClasses))
-            : ""
+    const { cssCode, notFound } = converted.reduce((acc, { cssCode, notFound, type }) => {
+        acc.notFound = acc.notFound.concat(notFound);
+        acc.cssCode = acc.cssCode + "\n";
+        if (type in breakpointPartialClasses) {
+            acc.cssCode = acc.cssCode + breakpointReplacer(cssCode, type as keyof typeof breakpointPartialClasses);
+            return acc;
         }
-${mdClasses.length !== 0
-            ? breakpoints[1][1].replace("...", "\n  " + convertToCss(mdClasses))
-            : ""
+        if (type in partialClasses) {
+            acc.cssCode = acc.cssCode + `\n:${type} {\n ${cssCode}}`;
+            return acc;
         }
-${lgClasses.length !== 0
-            ? breakpoints[2][1].replace("...", "\n  " + convertToCss(lgClasses))
-            : ""
-        }
-${xlClasses.length !== 0
-            ? breakpoints[3][1].replace("...", "\n  " + convertToCss(xlClasses))
-            : ""
-        }
-${_2xlClasses.length !== 0
-            ? breakpoints[4][1].replace("...", "\n  " + convertToCss(_2xlClasses))
-            : ""
-        }
-${hoverClasses.length !== 0 ? `:hover {\n ${convertToCss(hoverClasses)} }` : ""}
-`;
+        acc.cssCode = acc.cssCode + cssCode;
+        return acc;
+    }, {
+        cssCode: "",
+        notFound: [] as string[]
+    });
 
-    return resultCss.trimEnd();
+    console.log(notFound);
+
+    return { resultCss: cssCode.trimEnd(), notFound };
 };
 
 export const convertFromCssToJss = (css: string) => {
